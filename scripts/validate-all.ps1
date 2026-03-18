@@ -46,4 +46,4 @@ foreach ($env in $environments) {
     }
 }
 
-Write-Host "--- All modules and environments are valid! ✅ ---" -ForegroundColor Green
+Write-Host "--- All modules and environments are valid! ---" -ForegroundColor Green

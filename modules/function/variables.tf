@@ -33,6 +33,11 @@ variable "func_storage_account_name" {
   description = "Storage account name used for AzureWebJobsStorage (function host state)."
 }
 
+variable "func_package_storage_id" {
+  type        = string
+  description = "Resource ID of the storage account where function packages are stored."
+}
+
 variable "package_url" {
   type        = string
   description = "HTTPS URL to the function zip package in the private storage account. Set to '1' initially; updated by deployment scripts."

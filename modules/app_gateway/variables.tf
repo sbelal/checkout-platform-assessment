@@ -33,8 +33,8 @@ variable "ssl_certificate_secret_id" {
   type        = string
 }
 
-variable "ca_cert_pem" {
-  description = "PEM content of the CA certificate for mTLS trust"
+variable "ca_cert_secret_id" {
+  description = "Key Vault Secret ID for the CA certificate (PEM content)"
   type        = string
 }
 

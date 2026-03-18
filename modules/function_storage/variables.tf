@@ -23,10 +23,6 @@ variable "private_endpoints_subnet_id" {
   description = "Subnet ID for the storage private endpoint NIC."
 }
 
-variable "function_principal_id" {
-  type        = string
-  description = "Object ID of the Function App managed identity (granted Blob Data Reader)."
-}
 
 variable "deployer_principal_id" {
   type        = string

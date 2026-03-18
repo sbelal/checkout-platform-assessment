@@ -30,13 +30,6 @@ resource "azurerm_storage_container" "func_packages" {
   container_access_type = "private"
 }
 
-# ─── RBAC: grant Function App managed identity access to read packages ────────
-
-resource "azurerm_role_assignment" "func_blob_reader" {
-  scope                = azurerm_storage_account.func_packages.id
-  role_definition_name = "Storage Blob Data Reader"
-  principal_id         = var.function_principal_id
-}
 
 # ─── RBAC: grant Terraform deployer upload access ─────────────────────────────
 

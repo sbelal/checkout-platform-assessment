@@ -84,3 +84,11 @@ resource "azurerm_private_dns_zone_virtual_network_link" "func" {
   virtual_network_id    = var.virtual_network_id
   registration_enabled  = false
 }
+
+# ─── RBAC: grant Function App managed identity access to read packages ────────
+
+resource "azurerm_role_assignment" "func_blob_reader" {
+  scope                = var.func_package_storage_id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_linux_function_app.func.identity[0].principal_id
+}

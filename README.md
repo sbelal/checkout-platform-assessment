@@ -247,4 +247,8 @@ The recommended long-term evolution is to replace GitHub-hosted runners with **s
 - Align the CI/CD environment with the same private network as the deployed resources
 - Reduce the ~15s propagation wait added to every workflow run
 
+Another possible improvement is to use Azure DevOps instead of GitHub Actions, but that is not a requirement for this project.
+
+We can also look into using VPN to access the resources instead of dynamic IP injection
+
 See **ADR 6** in [`docs/project_ADR.md`](docs/project_ADR.md) for the full decision record.

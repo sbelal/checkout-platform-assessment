@@ -40,6 +40,11 @@ locals {
   trusted_root_cert_name = "trusted-root-ca-${var.environment}"
 }
 
+data "azurerm_key_vault_secret" "ca_cert" {
+  name         = element(split("/", var.ca_cert_secret_id), 4)
+  key_vault_id = var.key_vault_id
+}
+
 resource "azurerm_application_gateway" "appgw" {
   name                = "appgw-checkout-${var.environment}"
   resource_group_name = var.resource_group_name
@@ -90,14 +95,13 @@ resource "azurerm_application_gateway" "appgw" {
       policy_name = "AppGwSslPolicy20220101"
     }
 
-    verify_client_certificate_revocation = "None"
     trusted_client_certificate_names     = [local.trusted_root_cert_name]
   }
 
   # CA cert used to validate incoming client certificates
   trusted_root_certificate {
     name = local.trusted_root_cert_name
-    data = base64encode(var.ca_cert_pem)
+    data = base64encode(data.azurerm_key_vault_secret.ca_cert.value)
   }
 
   backend_address_pool {
