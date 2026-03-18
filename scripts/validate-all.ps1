@@ -1,6 +1,9 @@
 # validate-all.ps1
 # This script initializes (without backend) and validates all Terraform modules and environments.
 
+Write-Host "Running terraform fmt -recursive..."
+terraform fmt -recursive
+
 $ErrorActionPreference = "Stop"
 
 $modules = @(

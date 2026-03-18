@@ -30,14 +30,14 @@ resource "azurerm_role_assignment" "appgw_kv_secrets_user" {
 # ─── App Gateway ──────────────────────────────────────────────────────────────
 
 locals {
-  backend_pool_name      = "bp-func-${var.environment}"
-  backend_http_setting_name   = "bhs-func-${var.environment}"
-  frontend_ip_name       = "fip-internal-${var.environment}"
-  frontend_port_name     = "fport-443-${var.environment}"
-  listener_name          = "listener-https-${var.environment}"
-  routing_rule_name      = "rule-func-${var.environment}"
-  ssl_profile_name       = "ssl-profile-mtls-${var.environment}"
-  trusted_root_cert_name = "trusted-root-ca-${var.environment}"
+  backend_pool_name         = "bp-func-${var.environment}"
+  backend_http_setting_name = "bhs-func-${var.environment}"
+  frontend_ip_name          = "fip-internal-${var.environment}"
+  frontend_port_name        = "fport-443-${var.environment}"
+  listener_name             = "listener-https-${var.environment}"
+  routing_rule_name         = "rule-func-${var.environment}"
+  ssl_profile_name          = "ssl-profile-mtls-${var.environment}"
+  trusted_root_cert_name    = "trusted-root-ca-${var.environment}"
 }
 
 data "azurerm_key_vault_secret" "ca_cert" {
@@ -95,7 +95,7 @@ resource "azurerm_application_gateway" "appgw" {
       policy_name = "AppGwSslPolicy20220101"
     }
 
-    trusted_client_certificate_names     = [local.trusted_root_cert_name]
+    trusted_client_certificate_names = [local.trusted_root_cert_name]
   }
 
   # CA cert used to validate incoming client certificates

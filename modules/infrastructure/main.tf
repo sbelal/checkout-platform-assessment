@@ -62,9 +62,9 @@ module "function" {
 
   private_endpoints_subnet_id = module.vnet.subnet_private_endpoints_id
   func_outbound_subnet_id     = module.vnet.subnet_func_outbound_id
-  
-  func_storage_account_name   = module.function_storage.storage_account_name
-  func_package_storage_id     = module.function_storage.storage_account_id
+
+  func_storage_account_name = module.function_storage.storage_account_name
+  func_package_storage_id   = module.function_storage.storage_account_id
 
   # Package URL is managed by deployment scripts after initial infrastructure apply
   package_url = var.function_package_url
@@ -95,7 +95,7 @@ module "app_gateway" {
   appgw_private_ip    = var.appgw_private_ip
   key_vault_id        = module.key_vault.key_vault_id
   function_hostname   = module.function.function_app_hostname
-  
+
   # Certs provided by certificate_management module
   ssl_certificate_secret_id = module.certificate_management.server_cert_secret_id
   ca_cert_secret_id         = module.certificate_management.ca_cert_secret_id

@@ -13,8 +13,8 @@ resource "azurerm_linux_function_app" "func" {
   resource_group_name = var.resource_group_name
   location            = var.location
 
-  service_plan_id            = azurerm_service_plan.func.id
-  storage_account_name       = var.func_storage_account_name
+  service_plan_id               = azurerm_service_plan.func.id
+  storage_account_name          = var.func_storage_account_name
   storage_uses_managed_identity = true
 
   # Disable all public access — only reachable via private endpoint
@@ -40,12 +40,12 @@ resource "azurerm_linux_function_app" "func" {
     WEBSITE_RUN_FROM_PACKAGE = var.package_url
 
     # Disable built-in storage for function runtime state (use managed identity)
-    WEBSITE_CONTENTOVERVNET        = "1"
+    WEBSITE_CONTENTOVERVNET              = "1"
     WEBSITE_SKIP_CONTENTSHARE_VALIDATION = "1"
 
-    FUNCTIONS_WORKER_RUNTIME = "python"
-    AzureWebJobsStorage__accountName               = var.func_storage_account_name
-    AzureWebJobsStorage__credential                = "managedidentity"
+    FUNCTIONS_WORKER_RUNTIME         = "python"
+    AzureWebJobsStorage__accountName = var.func_storage_account_name
+    AzureWebJobsStorage__credential  = "managedidentity"
   }
 }
 

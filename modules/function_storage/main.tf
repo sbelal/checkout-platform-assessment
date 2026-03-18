@@ -1,9 +1,9 @@
 # Storage account for function deployment packages
 resource "azurerm_storage_account" "func_packages" {
-  name                = "stckofuncpkg${replace(var.environment, "-", "")}001"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  account_tier        = "Standard"
+  name                     = "stckofuncpkg${replace(var.environment, "-", "")}001"
+  resource_group_name      = var.resource_group_name
+  location                 = var.location
+  account_tier             = "Standard"
   account_replication_type = "LRS"
 
   # Security: disable all public/anonymous access
