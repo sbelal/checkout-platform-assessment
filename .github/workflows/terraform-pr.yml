@@ -138,7 +138,7 @@ jobs:
 
       - name: Post Plan as PR Comment
         uses: actions/github-script@v7
-        if: always()
+        if: always() && steps.plan.outcome != 'skipped'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -202,8 +202,12 @@ jobs:
         if: always()
         run: |
           RUNNER_IP="${{ steps.allowlist.outputs.runner_ip }}"
-          echo "Removing runner IP ${RUNNER_IP} from allowlists..."
-          az storage account network-rule remove --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP" || true
-          az keyvault network-rule remove        --name "$KEY_VAULT_NAME"       --ip-address "$RUNNER_IP" || true
-          az storage account network-rule remove --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" || true
-          echo "✅ Runner IP removed"
+          if [ -n "$RUNNER_IP" ]; then
+            echo "Removing runner IP ${RUNNER_IP} from allowlists..."
+            az storage account network-rule remove --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP" || true
+            az keyvault network-rule remove        --name "$KEY_VAULT_NAME"       --ip-address "$RUNNER_IP" || true
+            az storage account network-rule remove --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" || true
+            echo "✅ Runner IP removed"
+          else
+            echo "No IP was allowlisted, skipping cleanup."
+          fi
