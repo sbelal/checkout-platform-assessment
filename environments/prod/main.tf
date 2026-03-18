@@ -11,4 +11,5 @@ module "infrastructure" {
 
   allowed_ips          = var.allowed_ips
   function_package_url = var.function_package_url
+  func_service_plan_sku = var.func_service_plan_sku
 }

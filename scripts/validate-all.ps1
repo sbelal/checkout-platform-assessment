@@ -40,10 +40,13 @@ foreach ($env in $environments) {
     Write-Host "Validating environment: $env" -ForegroundColor Yellow
     Push-Location $env
     try {
-        terraform init -backend=false -reconfigure
+        terraform init -reconfigure
         if ($LASTEXITCODE -ne 0) { throw "Init failed for $env" }
         terraform validate
         if ($LASTEXITCODE -ne 0) { throw "Validation failed for $env" }
+        Write-Host "Running terraform plan for $env..." -ForegroundColor Cyan
+        terraform plan -no-color
+        if ($LASTEXITCODE -ne 0) { throw "Plan failed for $env" }
     } finally {
         Pop-Location
     }

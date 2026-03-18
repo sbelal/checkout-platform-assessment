@@ -26,7 +26,7 @@ resource "azurerm_storage_account" "func_packages" {
 # Versioned container per environment for function zip packages
 resource "azurerm_storage_container" "func_packages" {
   name                  = "func-packages-${var.environment}"
-  storage_account_name  = azurerm_storage_account.func_packages.name
+  storage_account_id    = azurerm_storage_account.func_packages.id
   container_access_type = "private"
 }
 
