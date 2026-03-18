@@ -72,11 +72,9 @@ Before Terraform can calculate and apply the infrastructure changes via GitHub A
    ```
 
 8. **Link GitHub Repo with Azure AD via OIDC**
-   To avoid hardcoded secrets, configure OpenID Connect (OIDC) federation between the GitHub repository and the newly created Service Principal:
-   - Go to the **Azure Portal** -> **Microsoft Entra ID** -> **App registrations** -> `github-actions-checkout-assessment` -> **Certificates & secrets** -> **Federated credentials**.
-   - Click "Add credential" and select "GitHub Actions deploying Azure resources".
-   - Enter your **GitHub Organization** and **Repository name**, Entity Type (e.g., `Branch`), and the corresponding branch name (e.g., `main`).
-   - Fill in an identifying name and description, then click "Add".
+   To avoid hardcoded secrets, configure OpenID Connect (OIDC) Workload Identity Federation between the GitHub repository and the newly created Service Principal. **Two federated credentials are required** — one for PR workflows and one for pushes to `main`.
+
+   For full step-by-step instructions (Portal and CLI), see: **[`docs/github-actions-oidc-setup.md`](docs/github-actions-oidc-setup.md)**.
 
 9. **Assign Storage Permissions to Service Principal**
    GitHub Actions requires permission to read and write the Terraform state files in the `stckoassignmenttfs001` storage account.
@@ -118,3 +116,25 @@ Before Terraform can calculate and apply the infrastructure changes via GitHub A
     ```
     
     - *Note: Azure role assignments may take a few minutes to fully propagate.*
+
+## CI/CD Pipeline
+
+This project uses **GitHub Actions** to automate Terraform validation and planning. There are two workflows:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| [terraform-pr.yml](.github/workflows/terraform-pr.yml) | Pull request → `main` | Validates all modules, runs `terraform fmt` check, and runs `terraform plan` for **dev**. Posts the plan output as a PR comment. |
+| [terraform-prod.yml](.github/workflows/terraform-prod.yml) | Merge to `main` | Runs `terraform plan` for **prod** and uploads the plan as a versioned artifact for audit trail. |
+
+> ⚠️ `terraform apply` is **intentionally excluded** from both pipelines. Production applies are a deliberate manual step run by an authorised engineer.
+
+### Setting Up the Pipeline
+
+Before the workflows will run, complete the one-time OIDC setup:
+
+👉 **[`docs/github-actions-oidc-setup.md`](docs/github-actions-oidc-setup.md)**
+
+This covers:
+- GitHub Secrets to add (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`)
+- Azure AD Federated Credentials (CLI + Portal instructions)
+- GitHub Environments configuration for `dev` and `prod`

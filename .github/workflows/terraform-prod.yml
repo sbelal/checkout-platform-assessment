@@ -1,0 +1,81 @@
+name: "Terraform — Plan Prod (Post-Merge)"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "environments/**"
+      - "modules/**"
+      - ".github/workflows/terraform-prod.yml"
+
+permissions:
+  id-token: write  # Required for OIDC token exchange
+  contents: read   # Required to checkout the repo
+
+env:
+  TF_VERSION: "1.5.7"
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_USE_OIDC: "true"
+
+jobs:
+  plan-prod:
+    name: "Terraform Plan — Prod"
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init — Prod
+        working-directory: environments/prod
+        run: terraform init
+
+      - name: Terraform Validate — Prod
+        working-directory: environments/prod
+        run: terraform validate
+
+      - name: Terraform Plan — Prod
+        working-directory: environments/prod
+        run: terraform plan -no-color -out=tfplan-prod 2>&1 | tee plan-output.txt
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-prod-${{ github.sha }}
+          path: |
+            environments/prod/tfplan-prod
+            environments/prod/plan-output.txt
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          echo "## ✅ Terraform Prod Plan Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Commit:** \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Triggered by:** ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The plan artifact \`tfplan-prod-${{ github.sha }}\` has been uploaded." >> "$GITHUB_STEP_SUMMARY"
+          echo "To apply, run \`terraform apply tfplan-prod\` in \`environments/prod\` after downloading the artifact." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Plan Output" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          head -100 environments/prod/plan-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
