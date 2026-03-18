@@ -100,3 +100,21 @@ Before Terraform can calculate and apply the infrastructure changes via GitHub A
    
    - *Note: The above operation to assign a Service Principal a role to blob storage can only be done using the Azure CLI, as this Service Principal cannot be found or added using the Azure Portal UI.*
    - *Note: Since GitHub Actions is only used for `terraform plan` in this project and never runs `terraform apply`, we are intentionally omitting subscription-level roles like `Contributor` and `User Access Administrator` to follow the Principle of Least Privilege.*
+
+10. **Assign Storage Permissions to Your User Account (For Local Execution)**
+    If you intend to run `terraform init` and `terraform plan` locally from your development machine, your Azure CLI user also needs data-plane access to the storage account, as shared key access is explicitly disabled.
+    
+    Execute the following Azure CLI commands to assign the **Storage Blob Data Contributor** role to your currently signed-in user:
+
+    ```bash
+    # Get the Object ID of your currently signed-in user
+    USER_ID=$(az ad signed-in-user show --query id --output tsv)
+
+    # Get the Resource ID of the Storage Account (if not already set)
+    STORAGE_ACCOUNT_ID=$(az storage account show --name stckoassignmenttfs001 --resource-group rg-terraform-state --query "id" --output tsv)
+
+    # Assign the Storage Blob Data Contributor role
+    az role assignment create --assignee $USER_ID --role "Storage Blob Data Contributor" --scope $STORAGE_ACCOUNT_ID
+    ```
+    
+    - *Note: Azure role assignments may take a few minutes to fully propagate.*
