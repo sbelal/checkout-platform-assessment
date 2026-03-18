@@ -33,7 +33,18 @@ override.tf.json
 *tfplan*
 plan-output.txt
 
-# Ignore CLI configuration files
+# CLI configuration files
 .terraformrc
 terraform.rc
 docs/prompts..md
+
+# Local dev IP allowlist — never commit, generated from dev.auto.tfvars.example
+**/dev.auto.tfvars
+# Keep the example file in version control
+!**/dev.auto.tfvars.example
+
+# Azure Function local settings and Python build artifacts
+src/function/local.settings.json
+src/function/.python_packages/
+src/function/__pycache__/
+src/function/*.pyc

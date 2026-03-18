@@ -36,49 +36,47 @@ Add these three secrets:
 
 ## Step 2 — Add Federated Credentials to the Service Principal
 
-You need two federated credentials: one for PR workflows and one for pushes to `main`.
+You need **two** federated credentials — one per GitHub Environment (`dev` and `prod`). Because the workflow jobs reference a GitHub Environment, Azure AD requires the subject to match the environment name, not the branch or PR trigger.
 
 ### Option A — Azure Portal
 
 1. Go to **Azure Active Directory → App registrations → `github-actions-checkout-assessment`**
 2. Click **Certificates & secrets → Federated credentials → Add credential**
 3. Choose **GitHub Actions deploying Azure resources**
-4. Fill in:
+4. Repeat for each credential below:
 
-| Field | PR Credential | Main Credential |
+| Field | Dev Credential | Prod Credential |
 |-------|--------------|-----------------|
-| Organisation | `YOUR_GITHUB_ORG` | `YOUR_GITHUB_ORG` |
-| Repository | `YOUR_REPO_NAME` | `YOUR_REPO_NAME` |
-| Entity type | **Pull request** | **Branch** |
-| Branch name | *(n/a for PR)* | `main` |
-| Name | `gh-actions-pr` | `gh-actions-main` |
+| Organisation | `sbelal` | `sbelal` |
+| Repository | `checkout-platform-assessment` | `checkout-platform-assessment` |
+| Entity type | **Environment** | **Environment** |
+| Environment name | `dev` | `prod` |
+| Name | `gh-actions-env-dev` | `gh-actions-env-prod` |
 
 ### Option B — Azure CLI
 
-Replace `YOUR_ORG` and `YOUR_REPO` with your values.
-
-**PR credential:**
+**Dev environment credential** (used by the PR workflow):
 ```bash
 SP_OBJECT_ID=$(az ad sp show --display-name "github-actions-checkout-assessment" --query id -o tsv)
 az ad app federated-credential create \
   --id $SP_OBJECT_ID \
   --parameters '{
-    "name": "gh-actions-pr",
+    "name": "gh-actions-env-dev",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:YOUR_ORG/YOUR_REPO:pull_request",
+    "subject": "repo:sbelal/checkout-platform-assessment:environment:dev",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
 
-**Main branch credential:**
+**Prod environment credential** (used by the post-merge workflow):
 ```bash
 SP_OBJECT_ID=$(az ad sp show --display-name "github-actions-checkout-assessment" --query id -o tsv)
 az ad app federated-credential create \
   --id $SP_OBJECT_ID \
   --parameters '{
-    "name": "gh-actions-main",
+    "name": "gh-actions-env-prod",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/main",
+    "subject": "repo:sbelal/checkout-platform-assessment:environment:prod",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```

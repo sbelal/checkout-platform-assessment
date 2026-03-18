@@ -1,4 +1,4 @@
-name: "Terraform — Plan Prod (Post-Merge)"
+name: "Terraform — Plan & Apply Prod (Post-Merge)"
 
 on:
   push:
@@ -19,10 +19,13 @@ env:
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: "true"
+  TF_STATE_SA: stckoassignmenttfs001
+  KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+  FUNC_PKG_SA: ${{ vars.FUNC_PKG_STORAGE_ACCOUNT }}
 
 jobs:
-  plan-prod:
-    name: "Terraform Plan — Prod"
+  plan-and-apply-prod:
+    name: "Terraform Plan & Apply — Prod"
     runs-on: ubuntu-latest
     environment: prod
 
@@ -43,6 +46,19 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # ── Add runner IP to all network allowlists ─────────────────────────────
+      - name: Add runner IP to network allowlists
+        id: allowlist
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
+          echo "Adding runner IP ${RUNNER_IP} to allowlists..."
+          az storage account network-rule add --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP"
+          az keyvault network-rule add        --name "$KEY_VAULT_NAME"       --ip-address "$RUNNER_IP" 2>/dev/null || true
+          az storage account network-rule add --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" 2>/dev/null || true
+          echo "Waiting 15s for rules to propagate..."
+          sleep 15
+
       - name: Terraform Init — Prod
         working-directory: environments/prod
         run: terraform init
@@ -52,6 +68,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan — Prod
+        id: plan
         working-directory: environments/prod
         run: terraform plan -no-color -out=tfplan-prod 2>&1 | tee plan-output.txt
 
@@ -65,17 +82,31 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Terraform Apply — Prod
+        working-directory: environments/prod
+        run: terraform apply -auto-approve tfplan-prod
+
       - name: Summary
         run: |
-          echo "## ✅ Terraform Prod Plan Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "## ✅ Terraform Prod Apply Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Commit:** \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "**Triggered by:** ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "The plan artifact \`tfplan-prod-${{ github.sha }}\` has been uploaded." >> "$GITHUB_STEP_SUMMARY"
-          echo "To apply, run \`terraform apply tfplan-prod\` in \`environments/prod\` after downloading the artifact." >> "$GITHUB_STEP_SUMMARY"
+          echo "The plan artifact \`tfplan-prod-${{ github.sha }}\` has been uploaded for audit trail." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Plan Output" >> "$GITHUB_STEP_SUMMARY"
           echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
           head -100 environments/prod/plan-output.txt >> "$GITHUB_STEP_SUMMARY"
           echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Always remove runner IP ─────────────────────────────────────────────
+      - name: Remove runner IP from network allowlists
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.allowlist.outputs.runner_ip }}"
+          echo "Removing runner IP ${RUNNER_IP} from allowlists..."
+          az storage account network-rule remove --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP" || true
+          az keyvault network-rule remove        --name "$KEY_VAULT_NAME"       --ip-address "$RUNNER_IP" || true
+          az storage account network-rule remove --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" || true
+          echo "✅ Runner IP removed"

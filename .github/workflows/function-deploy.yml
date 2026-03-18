@@ -1,0 +1,127 @@
+name: "Function — Build & Deploy"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/function/**"
+      - ".github/workflows/function-deploy.yml"
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
+env:
+  AZURE_FUNC_APP_NAME: func-checkout-${{ vars.ENVIRONMENT }}-001
+  AZURE_RESOURCE_GROUP: rg-checkout-assessment-${{ vars.ENVIRONMENT }}
+  STORAGE_ACCOUNT: ${{ vars.FUNC_PKG_STORAGE_ACCOUNT }}
+  CONTAINER: func-packages-${{ vars.ENVIRONMENT }}
+  KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+  TF_STATE_SA: stckoassignmenttfs001
+
+jobs:
+  build-and-deploy:
+    name: "Build & Deploy Function"
+    runs-on: ubuntu-latest
+    environment: ${{ vars.ENVIRONMENT || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Add runner IP to all network allowlists ─────────────────────────────
+      - name: Add runner IP to network allowlists
+        id: allowlist
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
+          echo "Adding runner IP ${RUNNER_IP} to allowlists..."
+          az storage account network-rule add --account-name "$TF_STATE_SA"    --ip-address "$RUNNER_IP"
+          az keyvault network-rule add        --name "$KEY_VAULT_NAME"          --ip-address "$RUNNER_IP"
+          az storage account network-rule add --account-name "$STORAGE_ACCOUNT" --ip-address "$RUNNER_IP"
+          echo "Waiting 15s for rules to propagate..."
+          sleep 15
+
+      # ── Build versioned zip ─────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build function package
+        id: build
+        run: |
+          VERSION="${{ github.sha }}"
+          PACKAGE_NAME="function-${VERSION}.zip"
+          echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+          cd src/function
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages" -q
+          zip -r "/tmp/${PACKAGE_NAME}" . \
+            -x "*.pyc" \
+            -x "__pycache__/*" \
+            -x "local.settings.json"
+          echo "✅ Package built: ${PACKAGE_NAME}"
+
+      # ── Upload to private blob container ───────────────────────────────────
+      - name: Upload package to storage
+        run: |
+          az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER" \
+            --name "${{ steps.build.outputs.package_name }}" \
+            --file "/tmp/${{ steps.build.outputs.package_name }}" \
+            --auth-mode login \
+            --overwrite
+
+      # ── Generate SAS URL ───────────────────────────────────────────────────
+      - name: Generate SAS URL
+        id: sas
+        run: |
+          EXPIRY=$(date -u -d "+1 year" +"%Y-%m-%dT%H:%MZ")
+          PACKAGE_URL=$(az storage blob generate-sas \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER" \
+            --name "${{ steps.build.outputs.package_name }}" \
+            --permissions r \
+            --expiry "$EXPIRY" \
+            --auth-mode login \
+            --as-user \
+            --full-uri \
+            --output tsv)
+          echo "package_url=${PACKAGE_URL}" >> "$GITHUB_OUTPUT"
+
+      # ── Update Function App and restart ────────────────────────────────────
+      - name: Update WEBSITE_RUN_FROM_PACKAGE
+        run: |
+          az functionapp config appsettings set \
+            --name "$AZURE_FUNC_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --settings "WEBSITE_RUN_FROM_PACKAGE=${{ steps.sas.outputs.package_url }}" \
+            --output none
+
+      - name: Restart Function App runtime
+        run: |
+          az functionapp restart \
+            --name "$AZURE_FUNC_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP"
+          echo "✅ Function App restarted"
+
+      # ── Always remove runner IP ─────────────────────────────────────────────
+      - name: Remove runner IP from network allowlists
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.allowlist.outputs.runner_ip }}"
+          echo "Removing runner IP ${RUNNER_IP} from allowlists..."
+          az storage account network-rule remove --account-name "$TF_STATE_SA"    --ip-address "$RUNNER_IP" || true
+          az keyvault network-rule remove        --name "$KEY_VAULT_NAME"          --ip-address "$RUNNER_IP" || true
+          az storage account network-rule remove --account-name "$STORAGE_ACCOUNT" --ip-address "$RUNNER_IP" || true
+          echo "✅ Runner IP removed"
