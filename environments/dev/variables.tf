@@ -51,3 +51,9 @@ variable "function_package_url" {
   description = "URL to the function zip package. Set to '1' initially; updated by deployment scripts."
   default     = "1"
 }
+
+variable "func_service_plan_sku" {
+  description = "The SKU for the Function App Service Plan (e.g., EP1, S1, Y1)"
+  type        = string
+  default     = "S1"
+}

@@ -43,3 +43,9 @@ variable "package_url" {
   description = "HTTPS URL to the function zip package in the private storage account. Set to '1' initially; updated by deployment scripts."
   default     = "1"
 }
+
+variable "service_plan_sku" {
+  description = "The SKU for the App Service Plan (e.g., EP1, S1, Y1)"
+  type        = string
+  default     = "EP1"
+}

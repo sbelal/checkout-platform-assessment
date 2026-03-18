@@ -65,6 +65,7 @@ module "function" {
 
   func_storage_account_name = module.function_storage.storage_account_name
   func_package_storage_id   = module.function_storage.storage_account_id
+  service_plan_sku          = var.func_service_plan_sku
 
   # Package URL is managed by deployment scripts after initial infrastructure apply
   package_url = var.function_package_url
