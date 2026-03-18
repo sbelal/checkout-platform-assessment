@@ -44,6 +44,12 @@ variable "package_url" {
   default     = "1"
 }
 
+variable "app_insights_connection_string" {
+  type        = string
+  description = "The connection string for Application Insights"
+  default     = null
+}
+
 variable "service_plan_sku" {
   description = "The SKU for the App Service Plan (e.g., EP1, S1, Y1)"
   type        = string

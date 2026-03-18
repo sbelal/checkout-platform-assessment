@@ -46,6 +46,10 @@ resource "azurerm_linux_function_app" "func" {
     FUNCTIONS_WORKER_RUNTIME         = "python"
     AzureWebJobsStorage__accountName = var.func_storage_account_name
     AzureWebJobsStorage__credential  = "managedidentity"
+
+    # Application Insights
+    APPLICATIONINSIGHTS_CONNECTION_STRING      = var.app_insights_connection_string
+    ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
 }
 

@@ -69,6 +69,8 @@ module "function" {
 
   # Package URL is managed by deployment scripts after initial infrastructure apply
   package_url = var.function_package_url
+
+  app_insights_connection_string = module.observability.app_insights_connection_string
 }
 
 # ─── Certificate Management ───────────────────────────────────────────────────
@@ -102,4 +104,95 @@ module "app_gateway" {
   ca_cert_secret_id         = module.certificate_management.ca_cert_secret_id
 
   depends_on = [module.key_vault, module.certificate_management]
+}
+# ─── Observability ────────────────────────────────────────────────────────────
+
+module "observability" {
+  source = "../observability"
+
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  environment         = var.environment
+  function_app_id     = module.function.function_app_id
+
+  tags = {
+    Environment = var.environment
+    Project     = "CheckoutAssessment"
+  }
+}
+
+# ─── Diagnostic Settings ──────────────────────────────────────────────────────
+
+resource "azurerm_monitor_diagnostic_setting" "vnet" {
+  name                       = "ds-vnet-${var.environment}"
+  target_resource_id         = module.vnet.vnet_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+
+  enabled_log {
+    category = "VMProtectionAlerts"
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "key_vault" {
+  name                       = "ds-kv-${var.environment}"
+  target_resource_id         = module.key_vault.key_vault_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+
+  enabled_log {
+    category = "AuditEvent"
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "app_gateway" {
+  name                       = "ds-appgw-${var.environment}"
+  target_resource_id         = module.app_gateway.resource_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+
+  enabled_log {
+    category = "ApplicationGatewayAccessLog"
+  }
+
+  enabled_log {
+    category = "ApplicationGatewayPerformanceLog"
+  }
+
+  enabled_log {
+    category = "ApplicationGatewayFirewallLog"
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "function" {
+  name                       = "ds-func-${var.environment}"
+  target_resource_id         = module.function.function_app_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+
+  enabled_log {
+    category = "FunctionAppLogs"
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "storage" {
+  name                       = "ds-storage-${var.environment}"
+  target_resource_id         = module.function_storage.storage_account_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+
+  metric {
+    category = "AllMetrics"
+  }
 }
