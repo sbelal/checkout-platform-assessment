@@ -10,8 +10,9 @@ resource "azurerm_key_vault" "kv" {
   # Use Azure RBAC for access control (not legacy vault access policies)
   rbac_authorization_enabled = true
 
-  # Fully disable public endpoint — all access via private endpoint
-  public_network_access_enabled = false
+  # ip_rules (set via var.allowed_ip_ranges) are only enforced when public access is enabled.
+  # The network_acls default_action=Deny still blocks everything not on the allowlist.
+  public_network_access_enabled = length(var.allowed_ip_ranges) > 0 ? true : false
 
   # Soft delete and purge protection for production safety
   soft_delete_retention_days = 7

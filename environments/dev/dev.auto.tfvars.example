@@ -6,3 +6,8 @@
 #   location              = "denmarkeast"
 
 func_service_plan_sku = "S1"
+
+# Allow your local machine's public IP through the Key Vault network firewall.
+# Required for `terraform plan` to read KV secrets (otherwise gets 403).
+# Find your IP: (Invoke-WebRequest https://api.ipify.org).Content
+# key_vault_allowed_ip_ranges = ["YOUR.PUBLIC.IP/32"]
