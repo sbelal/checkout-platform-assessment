@@ -21,6 +21,7 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: "true"
   TF_STATE_SA: stckoassignmenttfs001
+  KV_NAME: kv-checkout-dev-a1b2
   FUNC_PKG_SA: ${{ vars.FUNC_PKG_STORAGE_ACCOUNT }}
 
 jobs:
@@ -115,8 +116,11 @@ jobs:
           echo "Adding runner IP ${RUNNER_IP} to allowlists..."
           az storage account network-rule add --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP"
           az storage account network-rule add --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" 2>/dev/null || true
-          # Pass runner IP into Terraform so it is included in the Key Vault ip_rules
-          # (az keyvault network-rule add only adds a CLI-level rule outside TF state)
+          # Key Vault: enable public access (ip_rules are ignored when Disabled)
+          # then add runner IP so TF provider can reach KV during the refresh phase
+          az keyvault update --name "$KV_NAME" --public-network-access Enabled
+          az keyvault network-rule add --name "$KV_NAME" --ip-address "$RUNNER_IP"
+          # Also pass IP as TF var so the ip_rules in TF state match — avoids drift
           echo "TF_VAR_key_vault_allowed_ip_ranges=[\"${RUNNER_IP}/32\"]" >> "$GITHUB_ENV"
           echo "Waiting 15s for rules to propagate..."
           sleep 15
@@ -210,6 +214,7 @@ jobs:
             echo "Removing runner IP ${RUNNER_IP} from allowlists..."
             az storage account network-rule remove --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP" || true
             az storage account network-rule remove --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" || true
+            az keyvault network-rule remove --name "$KV_NAME" --ip-address "$RUNNER_IP" || true
             echo "✅ Runner IP removed"
           else
             echo "No IP was allowlisted, skipping cleanup."
