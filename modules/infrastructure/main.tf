@@ -32,6 +32,7 @@ module "key_vault" {
 
   private_endpoints_subnet_id = module.vnet.subnet_private_endpoints_id
   key_vault_suffix            = var.key_vault_suffix
+  allowed_ip_ranges           = var.key_vault_allowed_ip_ranges
 }
 
 # ─── Function Package Storage ─────────────────────────────────────────────────

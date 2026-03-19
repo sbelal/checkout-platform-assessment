@@ -62,3 +62,9 @@ variable "enable_public_access" {
   description = "When true, App Gateway uses a public IP (dev). When false, App Gateway is private-only (prod)."
   default     = true
 }
+
+variable "key_vault_allowed_ip_ranges" {
+  type        = list(string)
+  default     = []
+  description = "Public IPs (CIDR) allowed through the Key Vault network ACL so the Terraform runner can reach it during plan/apply."
+}
