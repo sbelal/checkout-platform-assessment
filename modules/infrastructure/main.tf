@@ -110,7 +110,7 @@ module "app_gateway" {
 module "observability" {
   source = "../observability"
 
-  location            = azurerm_resource_group.rg.location
+  location            = "westeurope"
   resource_group_name = azurerm_resource_group.rg.name
   environment         = var.environment
   function_app_id     = module.function.function_app_id

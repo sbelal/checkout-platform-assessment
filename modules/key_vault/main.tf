@@ -1,7 +1,11 @@
 data "azurerm_client_config" "current" {}
 
+resource "random_id" "vault_suffix" {
+  byte_length = 4
+}
+
 resource "azurerm_key_vault" "kv" {
-  name                = "kv-checkout-${var.environment}-001"
+  name                = "kv-checkout-${var.environment}-${random_id.vault_suffix.hex}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tenant_id           = data.azurerm_client_config.current.tenant_id

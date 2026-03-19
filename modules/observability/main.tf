@@ -24,17 +24,17 @@ resource "azurerm_monitor_metric_alert" "func_availability" {
   name                = "alert-func-availability-${var.environment}"
   resource_group_name = var.resource_group_name
   scopes              = [var.function_app_id]
-  description         = "Action will be triggered when Function App availability is less than 99%"
+  description         = "Action will be triggered when Function App encounters HTTP 5xx errors"
   severity            = 1
   frequency           = "PT1M"
   window_size         = "PT5M"
 
   criteria {
     metric_namespace = "Microsoft.Web/sites"
-    metric_name      = "Availability"
+    metric_name      = "Http5xx"
     aggregation      = "Average"
-    operator         = "LessThan"
-    threshold        = 99
+    operator         = "GreaterThan"
+    threshold        = 0
   }
 
   tags = var.tags
