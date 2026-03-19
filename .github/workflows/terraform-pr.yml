@@ -106,24 +106,35 @@ jobs:
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
         working-directory: .
-
       # ── Add runner IP to all network allowlists ─────────────────────────────
       - name: Add runner IP to network allowlists
         id: allowlist
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "runner_ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
-          echo "Adding runner IP ${RUNNER_IP} to allowlists..."
+          echo "Runner IP: ${RUNNER_IP}"
+
           az storage account network-rule add --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP"
           az storage account network-rule add --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" 2>/dev/null || true
-          # Key Vault: enable public access (ip_rules are ignored when Disabled)
-          # then add runner IP so TF provider can reach KV during the refresh phase
+
+          # Key Vault: enable public access first (ip_rules are ignored when Disabled)
+          # then add runner IP so the Terraform provider can reach KV during refresh phase
           az keyvault update --name "$KV_NAME" --public-network-access Enabled
           az keyvault network-rule add --name "$KV_NAME" --ip-address "$RUNNER_IP"
-          # Also pass IP as TF var so the ip_rules in TF state match — avoids drift
+
+          # Pass IP as TF var so ip_rules in TF state match — prevents drift on next apply
           echo "TF_VAR_key_vault_allowed_ip_ranges=[\"${RUNNER_IP}/32\"]" >> "$GITHUB_ENV"
-          echo "Waiting 15s for rules to propagate..."
-          sleep 15
+
+          # KV network rule propagation takes 1-5 min — poll until KV is actually reachable
+          echo "Waiting for Key Vault network rules to propagate (up to 5 min)..."
+          for i in {1..10}; do
+            if az keyvault key list --vault-name "$KV_NAME" --query "[]" -o tsv 2>/dev/null; then
+              echo "✅ Key Vault is reachable (attempt ${i})"
+              break
+            fi
+            echo "  Attempt ${i}/10: KV not yet reachable, sleeping 30s..."
+            sleep 30
+          done
 
       - name: Terraform Init — Dev
         working-directory: environments/dev

@@ -44,8 +44,21 @@ def add_allowlists(sa: str, ip: str):
     # Enable KV public access and add IP rule so Terraform provider can reach it
     az(f"keyvault update --name {KV_NAME} --public-network-access Enabled")
     az(f"keyvault network-rule add --name {KV_NAME} --ip-address {ip}")
-    print("Waiting 15s for propagation...")
-    time.sleep(15)
+
+    # KV network rule propagation takes 1-5 min — poll until reachable
+    print("Waiting for Key Vault network rules to propagate (up to 5 min)...")
+    for attempt in range(1, 11):
+        result = subprocess.run(
+            f"az keyvault key list --vault-name {KV_NAME} --query [] -o tsv",
+            capture_output=True, text=True, shell=True
+        )
+        if result.returncode == 0:
+            print(f"✅ Key Vault is reachable (attempt {attempt})")
+            return
+        print(f"  Attempt {attempt}/10: KV not yet reachable, sleeping 30s...")
+        time.sleep(30)
+    print("⚠️  WARNING: KV may not be fully reachable — proceeding anyway")
+
 
 
 def remove_allowlists(sa: str, ip: str):
