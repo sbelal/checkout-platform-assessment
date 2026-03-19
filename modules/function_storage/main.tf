@@ -8,7 +8,10 @@ resource "azurerm_storage_account" "func_packages" {
 
   # Security: disable all public/anonymous access
   allow_nested_items_to_be_public = false
-  shared_access_key_enabled       = false
+  public_network_access_enabled   = false
+
+  # Shared keys disabled — all access via managed identity / RBAC
+  shared_access_key_enabled = false
 
   # Entra ID becomes the default authentication method
   default_to_oauth_authentication = true
@@ -18,8 +21,6 @@ resource "azurerm_storage_account" "func_packages" {
   network_rules {
     default_action = "Deny"
     bypass         = ["AzureServices"]
-    # Allow dev machine IPs for local package uploads and terraform apply
-    ip_rules = var.allowed_ips
   }
 }
 
@@ -31,6 +32,8 @@ resource "azurerm_storage_container" "func_packages" {
 }
 
 
+
+
 # ─── RBAC: grant Terraform deployer upload access ─────────────────────────────
 
 resource "azurerm_role_assignment" "deployer_blob_contributor" {
@@ -39,7 +42,7 @@ resource "azurerm_role_assignment" "deployer_blob_contributor" {
   principal_id         = var.deployer_principal_id
 }
 
-# ─── Private Endpoint ─────────────────────────────────────────────────────────
+# ─── Private Endpoint (blob) ──────────────────────────────────────────────────
 
 resource "azurerm_private_endpoint" "func_packages" {
   name                = "pe-stckofuncpkg-${var.environment}"
@@ -60,10 +63,62 @@ resource "azurerm_private_endpoint" "func_packages" {
   }
 }
 
-# ─── Private DNS Zone ─────────────────────────────────────────────────────────
+# ─── Private Endpoint (queue) — required for AzureWebJobsStorage ─────────────
+
+resource "azurerm_private_endpoint" "func_queue" {
+  name                = "pe-stckofuncpkg-queue-${var.environment}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.private_endpoints_subnet_id
+
+  private_service_connection {
+    name                           = "psc-stckofuncpkg-queue-${var.environment}"
+    private_connection_resource_id = azurerm_storage_account.func_packages.id
+    subresource_names              = ["queue"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "funcpkg-queue-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.queue.id]
+  }
+}
+
+# ─── Private Endpoint (table) — required for AzureWebJobsStorage ─────────────
+
+resource "azurerm_private_endpoint" "func_table" {
+  name                = "pe-stckofuncpkg-table-${var.environment}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.private_endpoints_subnet_id
+
+  private_service_connection {
+    name                           = "psc-stckofuncpkg-table-${var.environment}"
+    private_connection_resource_id = azurerm_storage_account.func_packages.id
+    subresource_names              = ["table"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "funcpkg-table-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.table.id]
+  }
+}
+
+# ─── Private DNS Zones ────────────────────────────────────────────────────────
 
 resource "azurerm_private_dns_zone" "blob" {
   name                = "privatelink.blob.core.windows.net"
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_zone" "queue" {
+  name                = "privatelink.queue.core.windows.net"
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_zone" "table" {
+  name                = "privatelink.table.core.windows.net"
   resource_group_name = var.resource_group_name
 }
 
@@ -74,3 +129,21 @@ resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
   virtual_network_id    = var.virtual_network_id
   registration_enabled  = false
 }
+
+resource "azurerm_private_dns_zone_virtual_network_link" "queue" {
+  name                  = "funcpkg-queue-dns-link-${var.environment}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.queue.name
+  virtual_network_id    = var.virtual_network_id
+  registration_enabled  = false
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "table" {
+  name                  = "funcpkg-table-dns-link-${var.environment}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.table.name
+  virtual_network_id    = var.virtual_network_id
+  registration_enabled  = false
+}
+
+

@@ -23,8 +23,9 @@ variable "private_endpoints_subnet_id" {
   description = "Subnet ID for the Key Vault private endpoint NIC."
 }
 
-variable "allowed_ips" {
-  type        = list(string)
-  description = "List of public IP addresses (CIDR /32) allowed through Key Vault network rules. Use for local terraform apply."
-  default     = []
+
+
+variable "key_vault_suffix" {
+  type        = string
+  description = "Short alphanumeric suffix to make the Key Vault name globally unique (stable across deploys)."
 }

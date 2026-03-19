@@ -15,8 +15,8 @@ output "client_cert_secret_id" {
 }
 
 output "server_cert_secret_id" {
-  description = "Key Vault Secret ID for the Server cert (Listener)"
-  value       = azurerm_key_vault_secret.server_cert_pem.id
+  description = "Key Vault Secret ID for the Server cert (Listener) - versionless for App Gateway compatibility"
+  value       = azurerm_key_vault_certificate.server.versionless_secret_id
 }
 
 output "client_cert_pem" {

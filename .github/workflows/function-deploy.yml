@@ -1,12 +1,12 @@
 name: "Function — Build & Deploy"
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/function/**"
-      - ".github/workflows/function-deploy.yml"
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - "src/function/**"
+#       - ".github/workflows/function-deploy.yml"
 
 permissions:
   id-token: write  # Required for OIDC

@@ -42,3 +42,9 @@ variable "function_hostname" {
   type        = string
   description = "FQDN of the private Function App (e.g. func-checkout-dev-001.azurewebsites.net)."
 }
+
+variable "enable_public_access" {
+  type        = bool
+  description = "When true, the App Gateway listener uses the public IP (dev). When false, listener uses the private frontend only (prod)."
+  default     = true
+}

@@ -19,6 +19,7 @@ resource "azurerm_linux_function_app" "func" {
 
   # Disable all public access — only reachable via private endpoint
   public_network_access_enabled = false
+  https_only                    = true
 
   # Outbound VNet integration — all egress routed through the VNet
   virtual_network_subnet_id = var.func_outbound_subnet_id
@@ -35,14 +36,11 @@ resource "azurerm_linux_function_app" "func" {
     }
   }
 
+  # Disable built-in logging to prevent Azure from injecting the deprecated
+  # AzureWebJobsDashboard setting (which requires shared keys — disabled here)
+  builtin_logging_enabled = false
+
   app_settings = {
-    # Deploy from a zip package stored in the private storage account
-    WEBSITE_RUN_FROM_PACKAGE = var.package_url
-
-    # Disable built-in storage for function runtime state (use managed identity)
-    WEBSITE_CONTENTOVERVNET              = "1"
-    WEBSITE_SKIP_CONTENTSHARE_VALIDATION = "1"
-
     FUNCTIONS_WORKER_RUNTIME         = "python"
     AzureWebJobsStorage__accountName = var.func_storage_account_name
     AzureWebJobsStorage__credential  = "managedidentity"
@@ -50,6 +48,12 @@ resource "azurerm_linux_function_app" "func" {
     # Application Insights
     APPLICATIONINSIGHTS_CONNECTION_STRING      = var.app_insights_connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
+  }
+
+  # WEBSITE_RUN_FROM_PACKAGE is managed by the deploy script, not Terraform.
+  # Prevent terraform apply from resetting it back to the default value.
+  lifecycle {
+    ignore_changes = [app_settings["WEBSITE_RUN_FROM_PACKAGE"]]
   }
 }
 
@@ -89,10 +93,24 @@ resource "azurerm_private_dns_zone_virtual_network_link" "func" {
   registration_enabled  = false
 }
 
-# ─── RBAC: grant Function App managed identity access to read packages ────────
+# ─── RBAC: grant Function App managed identity full storage access ─────────────
+# AzureWebJobsStorage via managed identity requires these roles for
+# internal state management (leases, queues, tables) plus package reads.
 
-resource "azurerm_role_assignment" "func_blob_reader" {
+resource "azurerm_role_assignment" "func_blob_owner" {
   scope                = var.func_package_storage_id
-  role_definition_name = "Storage Blob Data Reader"
+  role_definition_name = "Storage Blob Data Owner"
+  principal_id         = azurerm_linux_function_app.func.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "func_queue_contributor" {
+  scope                = var.func_package_storage_id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = azurerm_linux_function_app.func.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "func_table_contributor" {
+  scope                = var.func_package_storage_id
+  role_definition_name = "Storage Table Data Contributor"
   principal_id         = azurerm_linux_function_app.func.identity[0].principal_id
 }

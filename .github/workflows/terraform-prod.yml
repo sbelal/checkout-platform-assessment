@@ -82,9 +82,10 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Terraform Apply — Prod
-        working-directory: environments/prod
-        run: terraform apply -auto-approve tfplan-prod
+      # NOTE: Apply step commented out — infrastructure changes require manual approval
+      # - name: Terraform Apply — Prod
+      #   working-directory: environments/prod
+      #   run: terraform apply -auto-approve tfplan-prod
 
       - name: Summary
         run: |

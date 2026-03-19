@@ -29,8 +29,4 @@ variable "deployer_principal_id" {
   description = "Object ID of the deployer (CI/CD SP or local user) granted Blob Data Contributor."
 }
 
-variable "allowed_ips" {
-  type        = list(string)
-  description = "Public IPs allowed through storage network rules for local terraform apply and package uploads."
-  default     = []
-}
+

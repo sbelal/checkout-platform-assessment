@@ -9,7 +9,8 @@ module "infrastructure" {
   subnet_appgw_cidr             = var.subnet_appgw_cidr
   appgw_private_ip              = var.appgw_private_ip
 
-  allowed_ips           = var.allowed_ips
   function_package_url  = var.function_package_url
   func_service_plan_sku = var.func_service_plan_sku
+  key_vault_suffix      = var.key_vault_suffix
+  enable_public_access  = var.enable_public_access
 }

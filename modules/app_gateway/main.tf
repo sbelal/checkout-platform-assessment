@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.9"
+    }
   }
 }
 
@@ -25,6 +29,18 @@ resource "azurerm_role_assignment" "appgw_kv_secrets_user" {
   scope                = var.key_vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.appgw.principal_id
+}
+
+resource "azurerm_role_assignment" "appgw_kv_certificate_user" {
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Certificate User"
+  principal_id         = azurerm_user_assigned_identity.appgw.principal_id
+}
+
+# Wait for RBAC propagation before App Gateway reads Key Vault secrets
+resource "time_sleep" "wait_for_rbac" {
+  depends_on      = [azurerm_role_assignment.appgw_kv_secrets_user, azurerm_role_assignment.appgw_kv_certificate_user]
+  create_duration = "30s"
 }
 
 # ─── App Gateway ──────────────────────────────────────────────────────────────
@@ -45,10 +61,23 @@ data "azurerm_key_vault_secret" "ca_cert" {
   key_vault_id = var.key_vault_id
 }
 
+# ─── Public IP (required by WAF_v2 SKU; only allocated when public access is enabled) ─
+
+resource "azurerm_public_ip" "appgw" {
+  count               = var.enable_public_access ? 1 : 0
+  name                = "pip-appgw-checkout-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  sku                 = "Standard"
+  allocation_method   = "Static"
+}
+
 resource "azurerm_application_gateway" "appgw" {
   name                = "appgw-checkout-${var.environment}"
   resource_group_name = var.resource_group_name
   location            = var.location
+
+  depends_on = [time_sleep.wait_for_rbac]
 
   identity {
     type         = "UserAssigned"
@@ -63,7 +92,7 @@ resource "azurerm_application_gateway" "appgw" {
 
   waf_configuration {
     enabled          = true
-    firewall_mode    = "Prevention"
+    firewall_mode    = "Detection"
     rule_set_type    = "OWASP"
     rule_set_version = "3.2"
   }
@@ -73,7 +102,16 @@ resource "azurerm_application_gateway" "appgw" {
     subnet_id = var.appgw_subnet_id
   }
 
-  # Internal private frontend — not exposed to the internet
+  # Public frontend — only created when public access is enabled
+  dynamic "frontend_ip_configuration" {
+    for_each = var.enable_public_access ? [1] : []
+    content {
+      name                 = "fip-public-${var.environment}"
+      public_ip_address_id = azurerm_public_ip.appgw[0].id
+    }
+  }
+
+  # Internal private frontend — always present
   frontend_ip_configuration {
     name                          = local.frontend_ip_name
     subnet_id                     = var.appgw_subnet_id
@@ -98,8 +136,8 @@ resource "azurerm_application_gateway" "appgw" {
     trusted_client_certificate_names = [local.trusted_root_cert_name]
   }
 
-  # CA cert used to validate incoming client certificates
-  trusted_root_certificate {
+  # CA cert used to validate incoming client certificates (mTLS)
+  trusted_client_certificate {
     name = local.trusted_root_cert_name
     data = base64encode(data.azurerm_key_vault_secret.ca_cert.value)
   }
@@ -122,7 +160,7 @@ resource "azurerm_application_gateway" "appgw" {
 
   http_listener {
     name                           = local.listener_name
-    frontend_ip_configuration_name = local.frontend_ip_name
+    frontend_ip_configuration_name = var.enable_public_access ? "fip-public-${var.environment}" : local.frontend_ip_name
     frontend_port_name             = local.frontend_port_name
     protocol                       = "Https"
     ssl_profile_name               = local.ssl_profile_name

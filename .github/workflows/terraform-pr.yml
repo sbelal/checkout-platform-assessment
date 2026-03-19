@@ -193,9 +193,10 @@ jobs:
         if: steps.plan.outputs.exit_code != '0'
         run: exit 1
 
-      - name: Terraform Apply — Dev
-        working-directory: environments/dev
-        run: terraform apply -auto-approve tfplan-dev
+      # NOTE: Apply step commented out — infrastructure changes require manual approval
+      # - name: Terraform Apply — Dev
+      #   working-directory: environments/dev
+      #   run: terraform apply -auto-approve tfplan-dev
 
       # ── Always remove runner IP ─────────────────────────────────────────────
       - name: Remove runner IP from network allowlists

@@ -13,6 +13,12 @@ variable "resource_group_name" {
   description = "The name of the resource group where the virtual network will be created."
 }
 
+variable "environment" {
+  type        = string
+  description = "Environment name (dev / prod), used for NSG naming."
+}
+
+
 variable "address_space" {
   type        = list(string)
   description = "The address space that is used by the virtual network."

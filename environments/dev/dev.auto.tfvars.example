@@ -1,9 +1,8 @@
-# Copy this file to dev.auto.tfvars (gitignored) and populate with your local machine's public IP.
-# This allows terraform apply to access Key Vault, function storage, and the TF state storage account
-# from your developer machine.
+# Environment-specific overrides for local dev.
+# Copy this file to dev.auto.tfvars (gitignored).
 #
-# Get your current public IP:
-#   Invoke-RestMethod https://api.ipify.org   (PowerShell)
-#   curl https://api.ipify.org               (Bash)
+# Example:
+#   func_service_plan_sku = "S1"
+#   location              = "denmarkeast"
 
-allowed_ips = ["<YOUR_PUBLIC_IP>/32"]
+func_service_plan_sku = "S1"

@@ -12,6 +12,7 @@ module "vnet" {
   vnet_name           = "vnet-checkout-assessment-${var.environment}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
+  environment         = var.environment
   address_space       = var.vnet_address_space
 
   subnet_private_endpoints_cidr = var.subnet_private_endpoints_cidr
@@ -30,7 +31,7 @@ module "key_vault" {
   virtual_network_id  = module.vnet.vnet_id
 
   private_endpoints_subnet_id = module.vnet.subnet_private_endpoints_id
-  allowed_ips                 = var.allowed_ips
+  key_vault_suffix            = var.key_vault_suffix
 }
 
 # ─── Function Package Storage ─────────────────────────────────────────────────
@@ -44,7 +45,6 @@ module "function_storage" {
   virtual_network_id  = module.vnet.vnet_id
 
   private_endpoints_subnet_id = module.vnet.subnet_private_endpoints_id
-  allowed_ips                 = var.allowed_ips
 
   # Grant the CI/CD SP / local user upload access
   deployer_principal_id = data.azurerm_client_config.current.object_id
@@ -91,13 +91,14 @@ module "certificate_management" {
 module "app_gateway" {
   source = "../app_gateway"
 
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  environment         = var.environment
-  appgw_subnet_id     = module.vnet.subnet_appgw_id
-  appgw_private_ip    = var.appgw_private_ip
-  key_vault_id        = module.key_vault.key_vault_id
-  function_hostname   = module.function.function_app_hostname
+  location             = azurerm_resource_group.rg.location
+  resource_group_name  = azurerm_resource_group.rg.name
+  environment          = var.environment
+  appgw_subnet_id      = module.vnet.subnet_appgw_id
+  appgw_private_ip     = var.appgw_private_ip
+  key_vault_id         = module.key_vault.key_vault_id
+  function_hostname    = module.function.function_app_hostname
+  enable_public_access = var.enable_public_access
 
   # Certs provided by certificate_management module
   ssl_certificate_secret_id = module.certificate_management.server_cert_secret_id

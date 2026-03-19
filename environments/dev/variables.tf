@@ -40,11 +40,7 @@ variable "appgw_private_ip" {
   default     = "10.0.3.10"
 }
 
-variable "allowed_ips" {
-  type        = list(string)
-  description = "Public IPs allowed through network rules for local terraform apply. Populate in dev.auto.tfvars (gitignored). Leave empty in CI/CD."
-  default     = []
-}
+
 
 variable "function_package_url" {
   type        = string
@@ -56,4 +52,16 @@ variable "func_service_plan_sku" {
   description = "The SKU for the Function App Service Plan (e.g., EP1, S1, Y1)"
   type        = string
   default     = "S1"
+}
+
+variable "key_vault_suffix" {
+  type        = string
+  description = "Short alphanumeric suffix for the Key Vault name."
+  default     = "a1b2"
+}
+
+variable "enable_public_access" {
+  type        = bool
+  description = "When true, App Gateway uses a public IP. Dev uses public for testing."
+  default     = true
 }

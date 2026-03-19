@@ -1,11 +1,7 @@
 data "azurerm_client_config" "current" {}
 
-resource "random_id" "vault_suffix" {
-  byte_length = 4
-}
-
 resource "azurerm_key_vault" "kv" {
-  name                = "kv-checkout-${var.environment}-${random_id.vault_suffix.hex}"
+  name                = "kv-checkout-${var.environment}-${var.key_vault_suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tenant_id           = data.azurerm_client_config.current.tenant_id
@@ -14,15 +10,16 @@ resource "azurerm_key_vault" "kv" {
   # Use Azure RBAC for access control (not legacy vault access policies)
   rbac_authorization_enabled = true
 
+  # Fully disable public endpoint — all access via private endpoint
+  public_network_access_enabled = false
+
   # Soft delete and purge protection for production safety
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  purge_protection_enabled   = true
 
   network_acls {
     default_action = "Deny"
     bypass         = "AzureServices"
-    # Allow dev machine IPs for local terraform apply
-    ip_rules = var.allowed_ips
   }
 }
 
@@ -62,10 +59,16 @@ resource "azurerm_private_dns_zone_virtual_network_link" "kv" {
   registration_enabled  = false
 }
 
-# ─── RBAC: grant Terraform deployer (current caller) secret management ───────
+# ─── RBAC: grant Terraform deployer (current caller) secret & cert management ─
 
 resource "azurerm_role_assignment" "kv_secrets_officer_deployer" {
   scope                = azurerm_key_vault.kv.id
   role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+resource "azurerm_role_assignment" "kv_certificates_officer_deployer" {
+  scope                = azurerm_key_vault.kv.id
+  role_definition_name = "Key Vault Certificates Officer"
   principal_id         = data.azurerm_client_config.current.object_id
 }

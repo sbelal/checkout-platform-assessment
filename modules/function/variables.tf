@@ -55,3 +55,5 @@ variable "service_plan_sku" {
   type        = string
   default     = "EP1"
 }
+
+

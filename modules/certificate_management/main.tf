@@ -64,43 +64,7 @@ resource "tls_locally_signed_cert" "client" {
   ]
 }
 
-# ─── TLS: Server cert (AGW Listener) signed by CA ─────────────────────────────
-
-resource "tls_private_key" "server" {
-  algorithm = "RSA"
-  rsa_bits  = 2048
-}
-
-resource "tls_cert_request" "server" {
-  private_key_pem = tls_private_key.server.private_key_pem
-
-  subject {
-    common_name  = "checkout-assessment-server-${var.environment}"
-    organization = "Checkout Assessment"
-  }
-
-  # SANs are often needed for server certs
-  dns_names = [
-    "checkout-${var.environment}.local",
-    "localhost"
-  ]
-}
-
-resource "tls_locally_signed_cert" "server" {
-  cert_request_pem   = tls_cert_request.server.cert_request_pem
-  ca_private_key_pem = tls_private_key.ca.private_key_pem
-  ca_cert_pem        = tls_self_signed_cert.ca.cert_pem
-
-  validity_period_hours = 8760 # 1 year
-
-  allowed_uses = [
-    "server_auth",
-    "digital_signature",
-    "key_encipherment",
-  ]
-}
-
-# ─── Key Vault: Store certs ───────────────────────────────────────────────────
+# ─── Key Vault: Store CA and client certs ─────────────────────────────────────
 
 resource "azurerm_key_vault_secret" "ca_cert_pem" {
   name         = "appgw-ca-cert-pem"
@@ -120,14 +84,55 @@ resource "azurerm_key_vault_secret" "client_key_pem" {
   key_vault_id = var.key_vault_id
 }
 
-resource "azurerm_key_vault_secret" "server_cert_pem" {
-  name         = "appgw-server-cert-pem"
-  value        = tls_locally_signed_cert.server.cert_pem
-  key_vault_id = var.key_vault_id
-}
+# ─── Key Vault: Server cert generated directly (PFX for App Gateway listener) ─
 
-resource "azurerm_key_vault_secret" "server_key_pem" {
-  name         = "appgw-server-key-pem"
-  value        = tls_private_key.server.private_key_pem
+
+resource "azurerm_key_vault_certificate" "server" {
+  name         = "appgw-server-cert"
   key_vault_id = var.key_vault_id
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 2048
+      key_type   = "RSA"
+      reuse_key  = true
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+      trigger {
+        days_before_expiry = 30
+      }
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12"
+    }
+
+    x509_certificate_properties {
+      key_usage = [
+        "digitalSignature",
+        "keyEncipherment",
+      ]
+
+      subject            = "CN=checkout-assessment-server-${var.environment}"
+      validity_in_months = 12
+
+      subject_alternative_names {
+        dns_names = [
+          "checkout-${var.environment}.local",
+          "localhost",
+        ]
+      }
+
+      extended_key_usage = ["1.3.6.1.5.5.7.3.1"] # serverAuth
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import azure.functions as func
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
@@ -10,9 +11,12 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 def process_message(req: func.HttpRequest) -> func.HttpResponse:
     """
     Accepts a POST request with a JSON body containing a 'message' field.
-    Returns a JSON response with the original message and a UTC timestamp.
+    Returns a JSON response with the original message, a UTC timestamp,
+    and a unique request ID.
     """
     logging.info("process_message function triggered.")
+
+    request_id = str(uuid.uuid4())
 
     # ── Parse JSON body ───────────────────────────────────────────────────────
     try:
@@ -45,6 +49,7 @@ def process_message(req: func.HttpRequest) -> func.HttpResponse:
     response_body = {
         "message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "request_id": request_id,
     }
 
     return func.HttpResponse(
