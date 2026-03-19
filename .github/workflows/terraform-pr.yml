@@ -1,4 +1,4 @@
-name: "Terraform — PR Validation (Dev)"
+name: "Terraform — PR Validation & Apply (Dev)"
 
 on:
   pull_request:
@@ -20,6 +20,8 @@ env:
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: "true"
+  TF_STATE_SA: stckoassignmenttfs001
+  FUNC_PKG_SA: ${{ vars.FUNC_PKG_STORAGE_ACCOUNT }}
 
 jobs:
   validate-modules:
@@ -49,8 +51,36 @@ jobs:
           terraform validate
           echo "✅ modules/vnet validated"
 
-  plan-dev:
-    name: "Terraform Plan — Dev"
+      - name: Validate module — key_vault
+        working-directory: modules/key_vault
+        run: |
+          terraform init -backend=false
+          terraform validate
+          echo "✅ modules/key_vault validated"
+
+      - name: Validate module — function_storage
+        working-directory: modules/function_storage
+        run: |
+          terraform init -backend=false
+          terraform validate
+          echo "✅ modules/function_storage validated"
+
+      - name: Validate module — function
+        working-directory: modules/function
+        run: |
+          terraform init -backend=false
+          terraform validate
+          echo "✅ modules/function validated"
+
+      - name: Validate module — app_gateway
+        working-directory: modules/app_gateway
+        run: |
+          terraform init -backend=false
+          terraform validate
+          echo "✅ modules/app_gateway validated"
+
+  plan-and-apply-dev:
+    name: "Terraform Plan & Apply — Dev"
     runs-on: ubuntu-latest
     needs: validate-modules
     environment: dev
@@ -75,6 +105,21 @@ jobs:
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
         working-directory: .
+      # ── Add runner IP to storage account allowlists ──────────────────────────
+      # NOTE: Key Vault is NOT allowlisted here — terraform plan uses -refresh=false
+      # which skips data-plane reads on existing resources (secrets, certs) entirely.
+      # This avoids 403s from the private KV without needing complex network rule
+      # propagation waits. Drift detection should be done via scheduled apply.
+      - name: Add runner IP to network allowlists
+        id: allowlist
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
+          echo "Runner IP: ${RUNNER_IP}"
+          az storage account network-rule add --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP"
+          az storage account network-rule add --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" 2>/dev/null || true
+          echo "Waiting 30s for storage rule propagation..."
+          sleep 30
 
       - name: Terraform Init — Dev
         working-directory: environments/dev
@@ -87,14 +132,17 @@ jobs:
       - name: Terraform Plan — Dev
         id: plan
         working-directory: environments/dev
+        # -refresh=false: skip data-plane reads for existing resources (KV secrets/certs).
+        # The KV data plane is private — reading existing state would 403.
+        # PR plans validate code changes against state; drift detection is a separate concern.
         run: |
-          terraform plan -no-color -out=tfplan-dev 2>&1 | tee plan-output.txt
+          terraform plan -no-color -refresh=false -out=tfplan-dev 2>&1 | tee plan-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
         continue-on-error: true
 
       - name: Post Plan as PR Comment
         uses: actions/github-script@v7
-        if: always()
+        if: always() && steps.plan.outcome != 'skipped'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -148,3 +196,23 @@ jobs:
       - name: Fail if plan failed
         if: steps.plan.outputs.exit_code != '0'
         run: exit 1
+
+      # NOTE: Apply step commented out — infrastructure changes require manual approval
+      # - name: Terraform Apply — Dev
+      #   working-directory: environments/dev
+      #   run: terraform apply -auto-approve tfplan-dev
+
+      # ── Always remove runner IP ─────────────────────────────────────────────
+      - name: Remove runner IP from network allowlists
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.allowlist.outputs.runner_ip }}"
+          if [ -n "$RUNNER_IP" ]; then
+            echo "Removing runner IP ${RUNNER_IP} from allowlists..."
+            az storage account network-rule remove --account-name "$TF_STATE_SA" --ip-address "$RUNNER_IP" || true
+            az storage account network-rule remove --account-name "$FUNC_PKG_SA" --ip-address "$RUNNER_IP" || true
+            echo "✅ Runner IP removed"
+          else
+            echo "No IP was allowlisted, skipping cleanup."
+          fi
+
