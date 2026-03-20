@@ -94,6 +94,12 @@ def main():
     try:
         add_allowlists(args.tf_state_sa, ip)
 
+        print(f"\n⚙️  Running terraform init in {args.tf_dir}...")
+        rc = tf("init -input=false", cwd=tf_dir)
+        if rc != 0:
+            print("❌ terraform init failed")
+            sys.exit(rc)
+
         print(f"\n📋 Running terraform plan in {args.tf_dir}...")
         rc = tf("plan -out=tfplan-local", cwd=tf_dir, extra_env=tf_env)
         if rc != 0:

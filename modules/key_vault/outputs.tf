@@ -12,3 +12,8 @@ output "key_vault_name" {
   description = "Name of the Key Vault."
   value       = azurerm_key_vault.kv.name
 }
+
+output "private_ip" {
+  description = "Private IP address of the Key Vault endpoint."
+  value       = azurerm_private_endpoint.kv.private_service_connection[0].private_ip_address
+}

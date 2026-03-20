@@ -21,6 +21,7 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: "true"
   TF_STATE_SA: stckoassignmenttfs001
+  KEY_VAULT_NAME: kv-checkout-dev-a1b2
   FUNC_PKG_SA: ${{ vars.FUNC_PKG_STORAGE_ACCOUNT }}
 
 jobs:
@@ -101,6 +102,17 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Grant Key Vault Administrator to CI/CD SP
+        run: |
+          KV_ID=$(az keyvault show --name "$KEY_VAULT_NAME" --query id -o tsv 2>/dev/null || true)
+          if [ -n "$KV_ID" ]; then
+            echo "Granting Key Vault Administrator role to SP on $KEY_VAULT_NAME..."
+            SP_ID=$(az ad sp show --id "$ARM_CLIENT_ID" --query id -o tsv)
+            az role assignment create --assignee "$SP_ID" --role "Key Vault Administrator" --scope "$KV_ID" --description "Temporary out-of-band assignment for Terraform" 2>/dev/null || echo "Role already assigned or error occurred."
+          else
+            echo "Key Vault $KEY_VAULT_NAME not found, skipping role assignment (initial deployment)."
+          fi
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive

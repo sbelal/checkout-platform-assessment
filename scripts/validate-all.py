@@ -11,6 +11,7 @@ MODULES = [
     "modules/function_storage",
     "modules/app_gateway",
     "modules/observability",
+    "modules/network_security",
     "modules/infrastructure",
 ]
 

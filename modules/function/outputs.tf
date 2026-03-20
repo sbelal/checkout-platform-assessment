@@ -17,3 +17,8 @@ output "function_principal_id" {
   description = "Object ID of the Function App system-assigned managed identity."
   value       = azurerm_linux_function_app.func.identity[0].principal_id
 }
+
+output "private_ip" {
+  description = "Private IP address of the Function App endpoint."
+  value       = azurerm_private_endpoint.func.private_service_connection[0].private_ip_address
+}

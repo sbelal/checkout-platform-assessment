@@ -46,6 +46,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Grant Key Vault Administrator to CI/CD SP
+        run: |
+          KV_ID=$(az keyvault show --name "$KEY_VAULT_NAME" --query id -o tsv 2>/dev/null || true)
+          if [ -n "$KV_ID" ]; then
+            echo "Granting Key Vault Administrator role to SP on $KEY_VAULT_NAME..."
+            SP_ID=$(az ad sp show --id "$ARM_CLIENT_ID" --query id -o tsv)
+            az role assignment create --assignee "$SP_ID" --role "Key Vault Administrator" --scope "$KV_ID" --description "Temporary out-of-band assignment for Terraform" 2>/dev/null || echo "Role already assigned or error occurred."
+          else
+            echo "Key Vault $KEY_VAULT_NAME not found, skipping role assignment (initial deployment)."
+          fi
+
       # ── Add runner IP to all network allowlists ─────────────────────────────
       - name: Add runner IP to network allowlists
         id: allowlist

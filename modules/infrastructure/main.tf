@@ -74,6 +74,30 @@ module "function" {
   app_insights_connection_string = module.observability.app_insights_connection_string
 }
 
+# ─── Network Security ─────────────────────────────────────────────────────────
+
+module "network_security" {
+  source = "../network_security"
+
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  environment         = var.environment
+
+  private_endpoints_subnet_id = module.vnet.subnet_private_endpoints_id
+  func_outbound_subnet_id     = module.vnet.subnet_func_outbound_id
+  appgw_subnet_id             = module.vnet.subnet_appgw_id
+
+  subnet_private_endpoints_cidr = var.subnet_private_endpoints_cidr
+  subnet_func_outbound_cidr     = var.subnet_func_outbound_cidr
+  subnet_appgw_cidr             = var.subnet_appgw_cidr
+
+  key_vault_private_ip     = module.key_vault.private_ip
+  function_app_private_ip  = module.function.private_ip
+  storage_blob_private_ip  = module.function_storage.blob_private_ip
+  storage_queue_private_ip = module.function_storage.queue_private_ip
+  storage_table_private_ip = module.function_storage.table_private_ip
+}
+
 # ─── Certificate Management ───────────────────────────────────────────────────
 
 module "certificate_management" {

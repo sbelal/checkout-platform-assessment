@@ -43,9 +43,9 @@ flowchart TB
 
     Client -- "HTTPS :443" --> AppGW
     AppGW -- "HTTPS :443\n(pick hostname)" --> PE_Func
+    AppGW -- "Key Vault Access\n(TCP :443)" --> PE_KV
     PE_Func --> FuncApp
     FuncApp --> VNetInt
-    VNetInt -- "Outbound via VNet" --> PE_KV
     VNetInt -- "Outbound via VNet" --> PE_Blob
     PE_KV --> KV
     PE_Blob --> Storage
@@ -87,7 +87,7 @@ flowchart LR
     end
 
     AGW --> PE1
-    FO --> PE2
+    AGW --> PE2
     FO --> PE3
 
     DNS1["Private DNS Zone\nazurewebsites.net"] -. "linked" .-> VNet
